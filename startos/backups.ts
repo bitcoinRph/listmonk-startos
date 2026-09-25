@@ -4,7 +4,8 @@ import { pgDataSubpath, pgMountpoint, postgresDb, postgresUser } from './utils'
 
 // The database is backed up as a pg_dump rather than raw files, so a backup
 // taken while listmonk is running is consistent. The main volume carries
-// store.json (generated secrets) and uploaded media.
+// the database secret and uploaded media. The mcp volume carries the
+// internal Listmonk API token and the client-facing MCP bearer token.
 export const { createBackup, restoreInit } = sdk.setupBackups(async () =>
   sdk.Backups.withPgDump({
     imageId: 'postgres',
@@ -18,5 +19,7 @@ export const { createBackup, restoreInit } = sdk.setupBackups(async () =>
       if (!pw) throw new Error('store.json is missing the database password')
       return pw
     },
-  }).addVolume('main'),
+  })
+    .addVolume('main')
+    .addVolume('mcp'),
 )

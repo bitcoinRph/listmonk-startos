@@ -10,7 +10,7 @@ export const manifest = setupManifest({
   marketingUrl: 'https://listmonk.app',
   donationUrl: null,
   description: { short, long },
-  volumes: ['main', 'db'],
+  volumes: ['main', 'db', 'mcp'],
   images: {
     listmonk: {
       source: { dockerTag: 'listmonk/listmonk:v6.2.0' },
@@ -18,6 +18,14 @@ export const manifest = setupManifest({
     },
     postgres: {
       source: { dockerTag: 'postgres:17-alpine' },
+      arch: ['x86_64', 'aarch64'],
+    },
+    mcp: {
+      source: {
+        dockerBuild: {
+          workdir: 'mcp',
+        },
+      },
       arch: ['x86_64', 'aarch64'],
     },
   },

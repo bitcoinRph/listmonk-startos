@@ -1,9 +1,11 @@
 import { i18n } from './i18n'
 import { sdk } from './sdk'
-import { uiPort } from './utils'
+import { mcpHostId, mcpPort, uiPort } from './utils'
 
 export const uiHostId = 'main'
 export const uiInterfaceId = 'ui'
+export const apiInterfaceId = 'api'
+export const mcpInterfaceId = 'mcp'
 
 // One interface serves both the admin dashboard (/admin) and the public
 // pages subscribers see (subscription forms, opt-in confirmation,
@@ -25,5 +27,38 @@ export const setInterfaces = sdk.setupInterfaces(async ({ effects }) => {
     path: '',
     query: {},
   })
-  return [await origin.export([ui])]
+  const api = sdk.createInterface(effects, {
+    name: i18n('REST API'),
+    id: apiInterfaceId,
+    description: i18n(
+      'Authenticated Listmonk API for lists, subscribers, campaigns, templates, media, settings, and reporting',
+    ),
+    type: 'api',
+    masked: false,
+    schemeOverride: null,
+    username: null,
+    path: '/api',
+    query: {},
+  })
+
+  const mcpHost = sdk.MultiHost.of(effects, mcpHostId)
+  const mcpOrigin = await mcpHost.bindPort(mcpPort, {
+    protocol: 'http',
+    preferredExternalPort: mcpPort,
+  })
+  const mcp = sdk.createInterface(effects, {
+    name: i18n('MCP'),
+    id: mcpInterfaceId,
+    description: i18n(
+      'Bearer-protected Streamable HTTP endpoint that exposes Listmonk operations as agent tools',
+    ),
+    type: 'api',
+    masked: false,
+    schemeOverride: null,
+    username: null,
+    path: '/mcp',
+    query: {},
+  })
+
+  return [await origin.export([ui, api]), await mcpOrigin.export([mcp])]
 })

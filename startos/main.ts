@@ -2,6 +2,10 @@ import { storeJson } from './fileModels/store.json'
 import { i18n } from './i18n'
 import { sdk } from './sdk'
 import {
+  mcpApiUsername,
+  mcpEnabledTools,
+  mcpMountpoint,
+  mcpPort,
   pgMountpoint,
   postgresDb,
   postgresPort,
@@ -43,17 +47,29 @@ export const main = sdk.setupMain(async ({ effects }) => {
     'listmonk-sub',
   )
 
-  // Same startup sequence as upstream's docker-compose.yml:
-  //   --install --idempotent  creates the schema (and the admin user from
-  //                           only on an empty database. With no
-  //                           LISTMONK_ADMIN_* variables, Listmonk shows its
-  //                           own first-run account setup page.
-  //   --upgrade               runs DB migrations after an image update
-  // --config '' makes listmonk read config from LISTMONK_* env vars only.
-  const listmonkCmd = [
+  const mcpSub = await sdk.SubContainer.of(
+    effects,
+    { imageId: 'mcp' },
+    sdk.Mounts.of().mountVolume({
+      volumeId: 'mcp',
+      subpath: null,
+      mountpoint: mcpMountpoint,
+      readonly: true,
+    }),
+    'mcp-sub',
+  )
+
+  // Same lifecycle as upstream's docker-compose.yml, split into StartOS
+  // oneshots so the MCP API user exists before Listmonk loads its auth cache:
+  //   --install --idempotent  creates the schema on an empty database. With
+  //                           no LISTMONK_ADMIN_* variables, Listmonk shows
+  //                           its own first-run account setup page.
+  //   --upgrade               runs DB migrations after an image update.
+  // --config '' makes Listmonk read file-based config from LISTMONK_* env
+  // vars only; settings changed in the UI still live in PostgreSQL.
+  const listmonkInstallCmd = [
     './listmonk --install --idempotent --yes --config ""',
     './listmonk --upgrade --yes --config ""',
-    'exec ./listmonk --config ""',
   ].join(' && ')
 
   return sdk.Daemons.of(effects)
@@ -89,10 +105,43 @@ export const main = sdk.setupMain(async ({ effects }) => {
       },
       requires: [],
     })
+    .addOneshot('listmonk-install', {
+      subcontainer: listmonkSub,
+      exec: {
+        command: sdk.useEntrypoint(['sh', '-c', listmonkInstallCmd]),
+        cwd: '/listmonk',
+        env: {
+          LISTMONK_app__address: `0.0.0.0:${uiPort}`,
+          LISTMONK_db__host: '127.0.0.1',
+          LISTMONK_db__port: String(postgresPort),
+          LISTMONK_db__user: postgresUser,
+          LISTMONK_db__password: postgresPassword,
+          LISTMONK_db__database: postgresDb,
+          LISTMONK_db__ssl_mode: 'disable',
+        },
+      },
+      requires: ['postgres'],
+    })
+    .addOneshot('mcp-provision', {
+      subcontainer: mcpSub,
+      exec: {
+        command: ['node', 'provision.mjs'],
+        cwd: '/opt/listmonk-mcp',
+        env: {
+          MCP_STORE_PATH: `${mcpMountpoint}/store.json`,
+          POSTGRES_HOST: '127.0.0.1',
+          POSTGRES_PORT: String(postgresPort),
+          POSTGRES_USER: postgresUser,
+          POSTGRES_PASSWORD: postgresPassword,
+          POSTGRES_DB: postgresDb,
+        },
+      },
+      requires: ['listmonk-install'],
+    })
     .addDaemon('listmonk', {
       subcontainer: listmonkSub,
       exec: {
-        command: sdk.useEntrypoint(['sh', '-c', listmonkCmd]),
+        command: sdk.useEntrypoint(['sh', '-c', 'exec ./listmonk --config ""']),
         cwd: '/listmonk',
         env: {
           LISTMONK_app__address: `0.0.0.0:${uiPort}`,
@@ -121,6 +170,34 @@ export const main = sdk.setupMain(async ({ effects }) => {
             },
           ),
       },
-      requires: ['postgres'],
+      requires: ['mcp-provision'],
+    })
+    .addDaemon('mcp', {
+      subcontainer: mcpSub,
+      exec: {
+        command: sdk.useEntrypoint(),
+        cwd: '/opt/listmonk-mcp',
+        env: {
+          MCP_STORE_PATH: `${mcpMountpoint}/store.json`,
+          LISTMONK_URL: `http://127.0.0.1:${uiPort}`,
+          LISTMONK_API_USER: mcpApiUsername,
+          LISTMONK_ENABLED_TOOLS: JSON.stringify(mcpEnabledTools),
+          PORT: String(mcpPort),
+        },
+      },
+      ready: {
+        display: i18n('MCP'),
+        gracePeriod: 5_000,
+        fn: () =>
+          sdk.healthCheck.checkWebUrl(
+            effects,
+            `http://127.0.0.1:${mcpPort}/healthz`,
+            {
+              successMessage: i18n('The MCP server is ready'),
+              errorMessage: i18n('The MCP server is not ready'),
+            },
+          ),
+      },
+      requires: ['listmonk'],
     })
 })

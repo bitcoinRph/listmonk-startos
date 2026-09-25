@@ -9,6 +9,12 @@ const dict = {
   'The web interface is not ready': 5,
   'Web UI': 6,
   'The listmonk admin dashboard at /admin, plus the public subscription, opt-in, and unsubscribe pages': 7,
+  'REST API': 8,
+  'Authenticated Listmonk API for lists, subscribers, campaigns, templates, media, settings, and reporting': 9,
+  MCP: 10,
+  'Bearer-protected Streamable HTTP endpoint that exposes Listmonk operations as agent tools': 11,
+  'The MCP server is ready': 12,
+  'The MCP server is not ready': 13,
 } as const
 
 /**

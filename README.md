@@ -1,47 +1,84 @@
-<a href="https://zerodha.tech"><img src="https://zerodha.tech/static/images/github-badge.svg" align="right" /></a>
+<p align="center">
+  <img src="icon.svg" alt="listmonk logo" width="21%">
+</p>
 
-[![listmonk-logo](https://user-images.githubusercontent.com/547147/231084896-835dba66-2dfe-497c-ba0f-787564c0819e.png)](https://listmonk.app)
+# listmonk on StartOS
 
-listmonk is a standalone, self-hosted, newsletter and mailing list manager. It is fast, feature-rich, and packed into a single binary. It uses a PostgreSQL database as its data store.
+> Everything not listed in this document should behave the same as upstream
+> listmonk. If a feature, setting, or behavior is not mentioned here, the
+> upstream documentation is accurate and fully applicable.
 
-[![listmonk-dashboard](https://github.com/user-attachments/assets/689b5fbb-dd25-4956-a36f-e3226a65f9c4)](https://listmonk.app)
+[listmonk](https://github.com/knadh/listmonk) is a self-hosted newsletter and mailing list manager. This package runs the upstream image with a bundled PostgreSQL database and generated credentials.
 
-Visit [listmonk.app](https://listmonk.app) for more info. Check out the [**live demo**](https://demo.listmonk.app).
+- **Upstream repo:** <https://github.com/knadh/listmonk>
+- **Wrapper repo:** <https://github.com/bitcoinRph/listmonk-startos>
 
-## Installation
+This repository is a fork of upstream listmonk, repurposed as a StartOS wrapper on the `startos-package` branch. The upstream source is not rebuilt; the package pulls the published image.
 
-### Docker
+## Image and Container Runtime
 
-The latest image is available on DockerHub at [`listmonk/listmonk:latest`](https://hub.docker.com/r/listmonk/listmonk/tags?page=1&ordering=last_updated&name=latest).
-Download and use the sample [docker-compose.yml](https://github.com/knadh/listmonk/blob/master/docker-compose.yml).
+| Property | Value |
+| --- | --- |
+| listmonk image | `listmonk/listmonk:v6.2.0` (upstream, unmodified) |
+| Database image | `postgres:17-alpine` (upstream, unmodified) |
+| Architectures | x86_64, aarch64 |
+| Start command | Upstream entrypoint, then `listmonk --install --idempotent`, `listmonk --upgrade`, `listmonk`, all with `--config ""` so config comes only from `LISTMONK_*` env vars. Same sequence as upstream `docker-compose.yml`. |
 
+## Volume and Data Layout
 
-```shell
-# Download the compose file to the current directory.
-curl -LO https://github.com/knadh/listmonk/raw/master/docker-compose.yml
+| Volume | Mounted at | Contents |
+| --- | --- | --- |
+| `main` | `/listmonk/uploads` (subpath `uploads`) | Uploaded media |
+| `main` | not mounted in any container (root) | `store.json`: generated Postgres and admin passwords |
+| `db` | `/var/lib/postgresql` | PostgreSQL cluster (`PGDATA=/var/lib/postgresql/data`) |
 
-# Run the services in the background.
-docker compose up -d
+`store.json` sits outside the uploads subpath, so it is never served over HTTP.
+
+## Network Access and Interfaces
+
+| Interface | Port | Type | Serves |
+| --- | --- | --- | --- |
+| Web UI (`ui` on host `main`) | 9000 | ui | Admin dashboard at `/admin`, public subscription forms, opt-in, unsubscribe, and archive pages |
+
+PostgreSQL listens on `127.0.0.1:5432` only and is not exposed.
+
+## Installation and First-Run Flow
+
+1. On install, init generates a 32-character Postgres password and a 24-character admin password into `store.json`, and posts a critical **Get Admin Credentials** task.
+2. On first start, Postgres initializes the `listmonk` database, then `listmonk --install --idempotent` creates the schema and the super admin `admin` from `LISTMONK_ADMIN_USER`/`LISTMONK_ADMIN_PASSWORD`.
+3. On later starts, `--install --idempotent` is a no-op and `--upgrade` applies any migrations after an image update.
+
+Root URL and SMTP are set by the user in the listmonk UI (stored in the database), not by the package.
+
+## Actions
+
+| Action | Effect |
+| --- | --- |
+| Get Admin Credentials | Shows `admin` and the generated password. Read-only. |
+
+## Health Checks
+
+| Check | Method |
+| --- | --- |
+| Database | `pg_isready` on 127.0.0.1 |
+| Web Interface | HTTP fetch of `http://127.0.0.1:9000/admin` (30 s grace period) |
+
+## Backups and Restore
+
+`sdk.Backups.withPgDump` on the `db` volume (logical dump, consistent while running) plus the full `main` volume. Restore re-posts the Get Admin Credentials task.
+
+## Limitations and Differences
+
+- The admin password is only applied on first install. Changing it in the listmonk UI makes the action's value stale.
+- No SMTP wiring to StartOS system SMTP; configure SMTP in listmonk settings.
+- English-only package strings.
+
+## Building
+
 ```
-Visit `http://localhost:9000`
+npm ci
+npm run check
+make            # x86_64 and aarch64 .s9pk
+```
 
-See [installation docs](https://listmonk.app/docs/installation)
-
-__________________
-
-### Binary
-- Download the [latest release](https://github.com/knadh/listmonk/releases) and extract the listmonk binary.
-- `./listmonk --new-config` to generate config.toml. Edit it.
-- `./listmonk --install` to setup the Postgres DB (or `--upgrade` to upgrade an existing DB. Upgrades are idempotent and running them multiple times have no side effects).
-- Run `./listmonk` and visit `http://localhost:9000`
-
-See [installation docs](https://listmonk.app/docs/installation)
-__________________
-
-
-## Developers
-listmonk is free and open source software licensed under AGPLv3. If you are interested in contributing, refer to the [developer setup](https://listmonk.app/docs/developer-setup). The backend is written in Go and the frontend is Vue with Buefy for UI. 
-
-
-## License
-listmonk is licensed under the AGPL v3 license.
+CI: `.github/workflows/build.yml` builds on pull requests using Start9's shared workflow.

@@ -1,0 +1,11 @@
+{
+  "name": "listmonk-startos-mcp-runtime",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pinned Listmonk MCP sidecar for the StartOS package",
+  "license": "MIT",
+  "dependencies": {
+    "@kieksme/listmonk-mcp": "1.3.0",
+    "pg": "8.23.0"
+  }
+}

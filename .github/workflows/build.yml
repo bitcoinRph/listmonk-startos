@@ -1,0 +1,18 @@
+name: Build
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths-ignore: ['*.md']
+  push:
+    branches: ['startos-package']
+    paths-ignore: ['*.md']
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    uses: Start9Labs/start-technologies/.github/workflows/build.yml@master
+    # No DEV_KEY: a build that does not publish does not need the signing key.

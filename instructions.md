@@ -6,11 +6,10 @@
 
 ## Getting set up
 
-1. After install, run the **Get Admin Credentials** task. It shows the admin username (`admin`) and a generated password. Save the password in your password manager.
-2. Start listmonk and open the **Web UI** address. The dashboard is at `/admin`.
-3. Go to **Settings > General** and set **Root URL** to the address subscribers will use (for example `https://news.example.com`). Links in emails, opt-in confirmations, and unsubscribe links are built from this value, so it must be an address the public can reach.
-4. Go to **Settings > SMTP** and add the mail server that will send your campaigns. Use **Test connection** before you save.
-5. Send a test campaign to yourself before sending to a list.
+1. Start listmonk and open the **Web UI** address. On the first visit, Listmonk asks you to create the super-admin account. Save that password in your password manager. StartOS does not generate, store, or display it.
+2. Go to **Settings > General** and set **Root URL** to the address subscribers will use (for example `https://news.example.com`). Links in emails, opt-in confirmations, and unsubscribe links are built from this value, so it must be an address the public can reach.
+3. Go to **Settings > SMTP** and add the mail server that will send your campaigns. Use **Test connection** before you save.
+4. Send a test campaign to yourself before sending to a list.
 
 ## Before sending to real subscribers
 
@@ -19,10 +18,10 @@
 - **Legal footer.** US law (CAN-SPAM) requires a physical mailing address and a working unsubscribe link in every commercial email. listmonk templates include the unsubscribe link by default; add your address to the template footer.
 - **Double opt-in.** Create lists as **Double opt-in** so each subscriber confirms their address.
 
-## Password
+## Account recovery
 
-The password shown by **Get Admin Credentials** is the one listmonk was set up with. If you change it inside listmonk, the action keeps showing the old one; use your new password.
+Listmonk owns the admin account and password. StartOS does not retain a copy. Configure SMTP and verify password-reset email before depending on it, and keep the password in your password manager.
 
 ## Backups
 
-StartOS backups include the full database (as a PostgreSQL dump), uploaded media, and the generated passwords.
+StartOS backups include the full database (as a PostgreSQL dump), uploaded media, and the internal database password.

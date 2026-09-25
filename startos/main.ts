@@ -2,7 +2,6 @@ import { storeJson } from './fileModels/store.json'
 import { i18n } from './i18n'
 import { sdk } from './sdk'
 import {
-  adminUser,
   pgMountpoint,
   postgresDb,
   postgresPort,
@@ -15,10 +14,10 @@ export const main = sdk.setupMain(async ({ effects }) => {
   console.info(i18n('Starting listmonk'))
 
   const store = await storeJson.read().const(effects)
-  if (!store?.postgresPassword || !store.adminPassword) {
-    throw new Error('store.json is missing generated credentials')
+  if (!store?.postgresPassword) {
+    throw new Error('store.json is missing the generated database password')
   }
-  const { postgresPassword, adminPassword } = store
+  const { postgresPassword } = store
 
   const postgresSub = await sdk.SubContainer.of(
     effects,
@@ -46,7 +45,9 @@ export const main = sdk.setupMain(async ({ effects }) => {
 
   // Same startup sequence as upstream's docker-compose.yml:
   //   --install --idempotent  creates the schema (and the admin user from
-  //                           LISTMONK_ADMIN_*) only on an empty database
+  //                           only on an empty database. With no
+  //                           LISTMONK_ADMIN_* variables, Listmonk shows its
+  //                           own first-run account setup page.
   //   --upgrade               runs DB migrations after an image update
   // --config '' makes listmonk read config from LISTMONK_* env vars only.
   const listmonkCmd = [
@@ -104,8 +105,6 @@ export const main = sdk.setupMain(async ({ effects }) => {
           LISTMONK_db__max_open: '25',
           LISTMONK_db__max_idle: '25',
           LISTMONK_db__max_lifetime: '300s',
-          LISTMONK_ADMIN_USER: adminUser,
-          LISTMONK_ADMIN_PASSWORD: adminPassword,
           TZ: 'Etc/UTC',
         },
       },

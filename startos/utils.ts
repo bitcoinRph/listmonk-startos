@@ -8,9 +8,6 @@ export const postgresUser = 'listmonk' as const
 export const postgresDb = 'listmonk' as const
 export const postgresPort = 5432
 
-// The super admin created on first start via LISTMONK_ADMIN_USER.
-export const adminUser = 'admin' as const
-
 // Where uploaded media lives in the listmonk container. Upstream's default
 // media path is ./uploads relative to /listmonk.
 export const uploadsDir = '/listmonk/uploads'

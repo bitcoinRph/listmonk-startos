@@ -122,11 +122,24 @@ export const main = sdk.setupMain(async ({ effects }) => {
       },
       requires: ['postgres'],
     })
+    .addOneshot('mcp-permissions', {
+      subcontainer: mcpSub,
+      exec: {
+        command: [
+          'sh',
+          '-c',
+          `chown node:node ${mcpMountpoint}/store.json && chmod 600 ${mcpMountpoint}/store.json`,
+        ],
+        user: 'root',
+      },
+      requires: ['listmonk-install'],
+    })
     .addOneshot('mcp-provision', {
       subcontainer: mcpSub,
       exec: {
         command: ['node', 'provision.mjs'],
         cwd: '/opt/listmonk-mcp',
+        user: 'node',
         env: {
           MCP_STORE_PATH: `${mcpMountpoint}/store.json`,
           POSTGRES_HOST: '127.0.0.1',
@@ -136,7 +149,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
           POSTGRES_DB: postgresDb,
         },
       },
-      requires: ['listmonk-install'],
+      requires: ['mcp-permissions'],
     })
     .addDaemon('listmonk', {
       subcontainer: listmonkSub,
@@ -177,6 +190,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
       exec: {
         command: sdk.useEntrypoint(),
         cwd: '/opt/listmonk-mcp',
+        user: 'node',
         env: {
           MCP_STORE_PATH: `${mcpMountpoint}/store.json`,
           LISTMONK_URL: `http://127.0.0.1:${uiPort}`,

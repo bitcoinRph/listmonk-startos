@@ -13,4 +13,4 @@ process.env.LISTMONK_API_TOKEN = store.listmonkToken
 process.env.MCP_SERVER_AUTH_TOKEN = store.serverAuthToken
 process.env.PORT = process.env.PORT ?? '3000'
 
-await import('@kieksme/listmonk-mcp/dist/index.js')
+await import('./server.mjs')

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <title>{{ .Campaign.Subject }}</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style type="text/css">
+    body { margin: 0; padding: 0; background: #F9F7F2; color: #26201A; }
+    table { border-collapse: collapse; border-spacing: 0; }
+    img { border: 0; display: block; line-height: 100%; outline: none; text-decoration: none; }
+    a { color: #A03E0F; text-decoration-color: currentColor; }
+    .preheader { display: none !important; max-height: 0; max-width: 0; opacity: 0; overflow: hidden; mso-hide: all; }
+    .page { width: 100%; background: #F9F7F2; }
+    .card { width: 100%; max-width: 620px; background: #FFFFFF; border: 1px solid #26201A; }
+    .pad { padding: 34px 38px; }
+    .eyebrow { color: #A03E0F; font-family: 'IBM Plex Mono', 'Courier New', monospace; font-size: 12px; font-weight: 700; letter-spacing: 1.2px; line-height: 18px; text-transform: uppercase; }
+    .issue { color: #6B6257; font-family: 'Public Sans', Arial, sans-serif; font-size: 12px; line-height: 18px; text-align: right; }
+    .body-copy { color: #26201A; font-family: 'Public Sans', Arial, sans-serif; font-size: 17px; line-height: 27px; }
+    .body-copy h1, .body-copy h2, .body-copy h3 { color: #26201A; font-family: Georgia, 'Times New Roman', serif; line-height: 1.15; }
+    .body-copy h1 { font-size: 34px; }
+    .body-copy h2 { font-size: 26px; }
+    .body-copy h3 { font-size: 21px; }
+    .body-copy img { height: auto; max-width: 100%; }
+    .body-copy a { color: #A03E0F !important; text-decoration-color: currentColor !important; }
+    .footer { color: #514A40; font-family: 'Public Sans', Arial, sans-serif; font-size: 12px; line-height: 18px; }
+    .footer a { color: #A03E0F !important; text-decoration-color: currentColor !important; }
+    .footer-link { display: inline-block; margin-right: 18px; }
+    @media only screen and (max-width: 660px) {
+      .mobile-shell { padding: 16px 12px !important; }
+      .pad { padding: 26px 22px !important; }
+      .issue { padding-top: 12px !important; text-align: left !important; }
+      .header-cell { display: block !important; width: 100% !important; }
+      .body-copy { font-size: 16px !important; line-height: 25px !important; }
+      .body-copy h1 { font-size: 30px !important; }
+      .footer-link { display: block !important; margin: 0 0 8px 0 !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="preheader">{{ .Campaign.Subject }}</div>
+  <table role="presentation" class="page" width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr>
+      <td class="mobile-shell" align="center" style="padding: 28px 16px;">
+        <!--[if mso]>
+        <table role="presentation" width="620" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td>
+        <![endif]-->
+        <table role="presentation" class="card" width="620" cellpadding="0" cellspacing="0" border="0" style="width: 100%; max-width: 620px; background: #FFFFFF; border: 1px solid #26201A; box-shadow: 6px 6px 0 #D8D1C5;">
+          <tr>
+            <td class="pad" style="padding: 34px 38px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td class="header-cell" width="70%" valign="top">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td width="52" valign="middle">
+                          <img src="https://www.freeholdagents.ai/apple-icon" alt="Freehold Agents" width="40" height="40" style="width: 40px; height: 40px;">
+                        </td>
+                        <td class="eyebrow" valign="middle" style="color: #A03E0F; font-family: 'Courier New', monospace; font-size: 12px; font-weight: 700; letter-spacing: 1.2px; line-height: 18px; text-transform: uppercase;">
+                          The Owner's Brief
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                  <td class="header-cell issue" width="30%" valign="middle" style="color: #6B6257; font-family: Arial, sans-serif; font-size: 12px; line-height: 18px; text-align: right;">
+                    Practical AI for owner-operated businesses
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="border-top: 1px solid #D8D1C5;"></td>
+          </tr>
+          <tr>
+            <td class="pad body-copy" style="padding: 34px 38px; color: #26201A; font-family: Arial, sans-serif; font-size: 17px; line-height: 27px;">
+              {{ template "content" . }}
+            </td>
+          </tr>
+          <tr>
+            <td style="border-top: 1px solid #D8D1C5;"></td>
+          </tr>
+          <tr>
+            <td class="pad footer" style="padding: 28px 38px; color: #514A40; font-family: Arial, sans-serif; font-size: 12px; line-height: 18px;">
+              <p style="margin: 0 0 12px 0;">Freehold AI LLC<br>200 S 21st St., STE 400A, Lincoln, NE 68510</p>
+              <p style="margin: 0;">
+                <a class="footer-link" href="{{ UnsubscribeURL }}" style="color: #A03E0F; margin-right: 18px;">{{ L.T "email.unsub" }}</a>
+                <a class="footer-link" href="{{ MessageURL }}" style="color: #A03E0F;">{{ L.T "email.viewInBrowser" }}</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+        <!--[if mso]>
+        </td></tr></table>
+        <![endif]-->
+      </td>
+    </tr>
+  </table>
+  {{ TrackView }}
+</body>
+</html>

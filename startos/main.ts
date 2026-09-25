@@ -3,7 +3,6 @@ import { i18n } from './i18n'
 import { sdk } from './sdk'
 import {
   mcpApiUsername,
-  mcpEnabledTools,
   mcpMountpoint,
   mcpPort,
   pgMountpoint,
@@ -45,6 +44,18 @@ export const main = sdk.setupMain(async ({ effects }) => {
       readonly: false,
     }),
     'listmonk-sub',
+  )
+
+  const mcpAdminSub = await sdk.SubContainer.of(
+    effects,
+    { imageId: 'mcp' },
+    sdk.Mounts.of().mountVolume({
+      volumeId: 'mcp',
+      subpath: null,
+      mountpoint: mcpMountpoint,
+      readonly: false,
+    }),
+    'mcp-admin-sub',
   )
 
   const mcpSub = await sdk.SubContainer.of(
@@ -123,7 +134,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
       requires: ['postgres'],
     })
     .addOneshot('mcp-permissions', {
-      subcontainer: mcpSub,
+      subcontainer: mcpAdminSub,
       exec: {
         command: [
           'sh',
@@ -195,7 +206,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
           MCP_STORE_PATH: `${mcpMountpoint}/store.json`,
           LISTMONK_URL: `http://127.0.0.1:${uiPort}`,
           LISTMONK_API_USER: mcpApiUsername,
-          LISTMONK_ENABLED_TOOLS: JSON.stringify(mcpEnabledTools),
+
           PORT: String(mcpPort),
         },
       },

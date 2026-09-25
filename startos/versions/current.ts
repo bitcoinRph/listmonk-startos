@@ -1,10 +1,10 @@
 import { IMPOSSIBLE, VersionInfo } from '@start9labs/start-sdk'
 
 export const current = VersionInfo.of({
-  version: '6.2.0:3',
+  version: '6.2.0:4',
   releaseNotes: {
     en_US:
-      'Adds a labeled REST API interface and a bearer-protected Streamable HTTP MCP server backed by a dedicated internal Listmonk API user.',
+      'Hardens the MCP boundary with exact server-side tools, least-privilege Listmonk permissions, blocked tool overrides, and a documented credential-transfer preflight.',
   },
   migrations: {
     up: async () => {},

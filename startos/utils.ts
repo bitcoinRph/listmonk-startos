@@ -8,19 +8,6 @@ export const mcpHostId = 'mcp'
 export const mcpPort = 3000
 export const mcpMountpoint = '/startos-mcp'
 export const mcpApiUsername = 'startos-mcp'
-export const mcpEnabledTools = [
-  'subscribers',
-  'campaigns',
-  'templates',
-  'lists',
-  'media',
-  'import',
-  'bounces',
-  'logs',
-  'public',
-  'miscellaneous',
-  'listmonk_get_settings',
-]
 
 // Bundled PostgreSQL. Listens on 127.0.0.1 only; never exposed as an interface.
 export const postgresUser = 'listmonk' as const

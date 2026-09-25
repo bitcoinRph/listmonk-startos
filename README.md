@@ -21,7 +21,7 @@ This repository is a fork of upstream listmonk, repurposed as a StartOS wrapper 
 | --- | --- |
 | listmonk image | `listmonk/listmonk:v6.2.0` (upstream, unmodified) |
 | Database image | `postgres:17-alpine` (upstream, unmodified) |
-| MCP runtime | `@kieksme/listmonk-mcp` 1.3.0 in a package-built Node.js sidecar |
+| MCP runtime | `@kieksme/listmonk-mcp` 1.3.0 behind a package-owned hardened HTTP entrypoint |
 | Architectures | x86_64, aarch64 |
 | Start sequence | PostgreSQL, Listmonk install/upgrade oneshot, MCP API-user provisioning oneshot, Listmonk, then the MCP server. Listmonk uses `--config ""` so file-based config comes only from `LISTMONK_*` env vars. |
 
@@ -32,7 +32,7 @@ This repository is a fork of upstream listmonk, repurposed as a StartOS wrapper 
 | `main` | `/listmonk/uploads` (subpath `uploads`) | Uploaded media |
 | `main` | not mounted in any container (root) | `store.json`: generated internal Postgres password |
 | `db` | `/var/lib/postgresql` | PostgreSQL cluster (`PGDATA=/var/lib/postgresql/data`) |
-| `mcp` | `/startos-mcp` in the MCP sidecar, read-only | Internal Listmonk API token and client-facing MCP bearer token |
+| `mcp` | `/startos-mcp` in the MCP sidecar | Internal Listmonk API token and client-facing MCP bearer token; repaired through a writable root-only lifecycle mount, then mounted read-only for the non-root MCP daemon |
 
 Both credential stores sit outside the uploads subpath, so neither is served over HTTP.
 
@@ -42,7 +42,7 @@ Both credential stores sit outside the uploads subpath, so neither is served ove
 | --- | --- | --- | --- |
 | Web UI (`ui` on host `main`) | 9000 | ui | Admin dashboard at `/admin`, public subscription forms, opt-in, unsubscribe, and archive pages |
 | REST API (`api` on host `main`) | 9000 | api | Listmonk's authenticated `/api` endpoints |
-| MCP (`mcp` on host `mcp`) | 3000 | api | Streamable HTTP endpoint at `/mcp`; requires an `Authorization: Bearer` header |
+| MCP (`mcp` on host `mcp`) | 3000 | api | Streamable HTTP endpoint at `/mcp`; requires an HTTP `Authorization` header using bearer authentication |
 
 PostgreSQL listens on `127.0.0.1:5432` only and is not exposed.
 
@@ -58,13 +58,22 @@ Root URL and SMTP are set by the user in the Listmonk UI (stored in the database
 
 ## Actions
 
-None. Account creation and password management stay inside Listmonk.
+- **Rotate MCP Bearer** generates a new Hermes-facing bearer, retains the prior bearer for rollback, rejects duplicate pending rotations, and never displays either value.
+- **Rollback MCP Bearer** restores the retained bearer and clears the failed rotation without displaying either value.
+- **Finalize MCP Bearer Rotation** removes the retained rollback bearer after the new bearer is verified.
+- **Export Encrypted MCP Bearer** returns only RSA-OAEP ciphertext encrypted to a one-time public key generated inside Hermes.
+
+Account creation and password management stay inside Listmonk. Follow the credential runbook before using any bearer action.
 
 ## MCP Authentication
 
-The MCP endpoint is not open. It requires the bearer token generated into the private `mcp` volume. That token is intentionally not returned through a StartOS action because action responses can be written to package logs. Configure an agent through a secure local management path and send the token only as an `Authorization: Bearer` header.
+The MCP endpoint is not open. It requires the bearer generated into the private `mcp` volume. The plaintext token is never returned through a StartOS action because action responses can be written to package logs. The encrypted handoff action returns only ciphertext that can be decrypted by the one-time private key kept inside Hermes. Configure an agent through the protected transfer runbook and use the standard HTTP bearer scheme.
 
-The MCP sidecar uses a separate Listmonk API user named `startos-mcp`; it does not use or know the human administrator password. Its package-owned role permits lists, subscribers, imports, campaigns, bounces, media, templates, reporting, and read-only settings access. The MCP server omits user administration, settings changes, maintenance deletion, transactional email, and application-reload tools. Campaign tools can still send mail, so treat MCP access as sensitive and do not publish its interface without an additional access-control review.
+The MCP sidecar uses a separate Listmonk API user named `startos-mcp`; it does not use or know the human administrator password. Its package-owned role permits subscriber reads, campaign drafting and reporting, list/template/media management, and bounce reads. It does not grant campaign-wide bypass permissions, settings access, campaign sending, subscriber mutation/import, or bounce-management permissions.
+
+The package registers exactly 32 named tools from one canonical policy file. It does not enable broad categories. Campaign update, send, campaign-status, test-send, opt-in-send, delete, blocklist, import, subscriber-create/update, membership-mutation, default-template, settings/log retrieval, settings mutation, user administration, maintenance, transactional email, and application reload tools are absent. The campaign-create wrapper removes and rejects `send_later` and `send_at`, so creation can only produce a draft. Requests carrying `X-Listmonk-Enabled-Tools` or a `tools` query parameter are rejected instead of expanding the tool set.
+
+Treat the bearer as sensitive and keep the MCP interface internal. Follow [`docs/hermes-listmonk-credential-runbook.md`](docs/hermes-listmonk-credential-runbook.md) for transfer, runtime-user preflight, restart, rollback, and rotation.
 
 ## Health Checks
 
@@ -78,10 +87,15 @@ The MCP sidecar uses a separate Listmonk API user named `startos-mcp`; it does n
 
 `sdk.Backups.withPgDump` on the `db` volume (logical dump, consistent while running) plus the full `main` and `mcp` volumes. A restore preserves the Listmonk administrator account, dedicated API user, and MCP credentials.
 
+Package downgrades are declared impossible. Before a sideload, keep a pre-update PostgreSQL custom-format dump and validate it with `pg_restore -l <dump-file>`. The recovery path is reinstalling the prior package revision and restoring the validated dump plus the `main` and `mcp` volumes. Template rollback artifacts must preserve the complete template record (`id`, `name`, `type`, `subject`, `body`, and default status), not only the HTML body.
+
+Use timestamped, no-clobber rollback filenames and verify owner and mode after creation. Do not overwrite a prior recovery point.
+
 ## Limitations and Differences
 
 - StartOS cannot retrieve or reset the Listmonk admin password; configure Listmonk email-based password recovery and keep the password in a password manager.
-- The MCP bearer token is deliberately not exposed through an action. Agent configuration requires a secure local credential-transfer step.
+- The MCP bearer token is deliberately not exposed in plaintext through an action. Agent configuration requires the encrypted local procedure in [`docs/hermes-listmonk-credential-runbook.md`](docs/hermes-listmonk-credential-runbook.md).
+- The bundled Owner's Brief template uses the existing Freehold website PNG endpoint rather than a packaged dead asset. Treat that remote endpoint as an availability dependency and recheck it during template QA.
 - No SMTP wiring to StartOS system SMTP; configure SMTP in listmonk settings.
 - English-only package strings.
 

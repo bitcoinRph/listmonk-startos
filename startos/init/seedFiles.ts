@@ -24,5 +24,6 @@ export const seedFiles = sdk.setupOnInit(async (effects, kind) => {
     serverAuthToken:
       mcpStore?.serverAuthToken ??
       utils.getDefaultString({ charset: 'a-z,A-Z,0-9', len: 48 }),
+    previousServerAuthToken: mcpStore?.previousServerAuthToken,
   })
 })

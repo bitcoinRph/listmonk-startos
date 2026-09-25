@@ -4,6 +4,7 @@ import { sdk } from '../sdk'
 const shape = z.object({
   listmonkToken: z.string().optional().catch(undefined),
   serverAuthToken: z.string().optional().catch(undefined),
+  previousServerAuthToken: z.string().optional().catch(undefined),
 })
 
 export const mcpStoreJson = FileHelper.json(

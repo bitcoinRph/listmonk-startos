@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import pg from 'pg'
+import { LISTMONK_ROLE_PERMISSIONS } from './policy.mjs'
 
 const { Client } = pg
 const storePath = process.env.MCP_STORE_PATH ?? '/startos-mcp/store.json'
@@ -26,28 +27,6 @@ try {
   const tokenHash = createHash('sha256')
     .update(store.listmonkToken)
     .digest('hex')
-  const permissions = [
-    'lists:get_all',
-    'lists:manage_all',
-    'subscribers:get',
-    'subscribers:get_all',
-    'subscribers:manage',
-    'subscribers:import',
-    'campaigns:get',
-    'campaigns:get_all',
-    'campaigns:get_analytics',
-    'campaigns:manage',
-    'campaigns:manage_all',
-    'campaigns:send',
-    'bounces:get',
-    'bounces:manage',
-    'media:get',
-    'media:manage',
-    'templates:get',
-    'templates:manage',
-    'settings:get',
-  ]
-
   await client.query('BEGIN')
   const role = await client.query(
     `INSERT INTO roles (type, name, permissions)
@@ -56,7 +35,7 @@ try {
        permissions = EXCLUDED.permissions,
        updated_at = NOW()
      RETURNING id`,
-    ['StartOS MCP', permissions],
+    ['StartOS MCP', LISTMONK_ROLE_PERMISSIONS],
   )
 
   await client.query(

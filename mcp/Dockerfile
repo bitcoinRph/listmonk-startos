@@ -7,7 +7,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts \
     && npm cache clean --force
 
-COPY provision.mjs run.mjs ./
+COPY provision.mjs run.mjs server.mjs hardened-tools.mjs policy.mjs policy.json security.mjs ./
 
 USER node
 

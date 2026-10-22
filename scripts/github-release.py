@@ -15,9 +15,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ApiError(RuntimeError):
-    def __init__(self, status):
+    def __init__(self, status, category='http', exit_code=None):
         self.status = status
-        super().__init__(f'GitHub API failed: HTTP {status}')
+        self.category = category
+        self.exit_code = exit_code
+        super().__init__(f'GitHub API failed: HTTP {status}; category={category}; gh_exit={exit_code}')
 
 
 def api(endpoint, method='GET', fields=None, output=None) -> Any:
@@ -27,7 +29,23 @@ def api(endpoint, method='GET', fields=None, output=None) -> Any:
     result = subprocess.run(cmd, stdout=output or subprocess.PIPE, stderr=subprocess.PIPE, check=False)
     if result.returncode:
         status = re.search(rb'HTTP (\d{3})', result.stderr)
-        raise ApiError(int(status[1]) if status else 0)
+        # Never expose raw gh stderr: it can contain signed redirect URLs or tokens.
+        # Only fixed diagnostic labels leave this boundary; unknown errors fail closed.
+        category = 'http' if status else 'unknown'
+        if not status:
+            stderr = result.stderr.lower()
+            for label, markers in [
+                ('timeout', (b'timeout', b'deadline exceeded')),
+                ('connection-reset', (b'connection reset by peer',)),
+                ('unexpected-eof', (b'unexpected eof',)),
+                ('tls', (b'x509:', b'tls:')),
+                ('dns', (b'no such host',)),
+                ('redirect', (b'stopped after 10 redirects',)),
+            ]:
+                if any(marker in stderr for marker in markers):
+                    category = label
+                    break
+        raise ApiError(int(status[1]) if status else 0, category, result.returncode)
     return None if output else json.loads(result.stdout)
 
 

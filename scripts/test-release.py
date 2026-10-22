@@ -17,6 +17,32 @@ class ReleaseTests(unittest.TestCase):
         cls.r = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(cls.r)
 
+    def test_api_failure_diagnostics_are_safe_and_do_not_retry(self):
+        import subprocess
+        # Synthetic secrets and signed redirect only; never live credentials.
+        secret = b'https://logs.example/private?sig=SYNTHETIC_SECRET Authorization: Bearer SYNTHETIC_TOKEN'
+        cases = [
+            (b'gh: Forbidden (HTTP 403) ' + secret, 403, 'http'),
+            (b'Get "' + secret + b'": net/http: TLS handshake timeout', 0, 'timeout'),
+            (b'Get "' + secret + b'": connection reset by peer', 0, 'connection-reset'),
+            (b'Get "' + secret + b'": unexpected EOF', 0, 'unexpected-eof'),
+            (b'Get "' + secret + b'": x509: certificate signed by unknown authority', 0, 'tls'),
+            (b'Get "' + secret + b'": no such host', 0, 'dns'),
+            (b'Get "' + secret + b'": stopped after 10 redirects', 0, 'redirect'),
+            (b'unknown failure ' + secret, 0, 'unknown'),
+        ]
+        for stderr, status, category in cases:
+            with self.subTest(category=category), patch.object(self.r.subprocess, 'run', return_value=subprocess.CompletedProcess([], 1, b'', stderr)) as run:
+                with self.assertRaises(self.r.ApiError) as raised:
+                    self.r.api('repos/owner/repo/actions/jobs/123/logs')
+                error = raised.exception
+                self.assertEqual(error.status, status)
+                self.assertEqual(getattr(error, 'category', None), category)
+                self.assertEqual(getattr(error, 'exit_code', None), 1)
+                self.assertEqual(str(error), f'GitHub API failed: HTTP {status}; category={category}; gh_exit=1')
+                self.assertNotIn('SYNTHETIC', repr(vars(error)) + str(error))
+                run.assert_called_once()
+
     def test_actual_metadata(self):
         self.assertEqual(self.r.metadata(ROOT), ('6.2.0:5', 'v6.2.0_5'))
 

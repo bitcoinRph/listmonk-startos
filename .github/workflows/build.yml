@@ -1,6 +1,7 @@
 name: Build
 
 on:
+  workflow_call:
   workflow_dispatch:
   pull_request:
     paths-ignore: ['*.md']
@@ -27,7 +28,11 @@ jobs:
       - run: npm ci --prefix mcp --omit=dev --ignore-scripts
       - run: npm run check
       - run: npm test
+      - run: python3 scripts/test-release.py
+      - run: python3 scripts/github-release.py metadata
+      - name: Lint GitHub workflows (including inline shell)
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
   build:
     needs: test
-    uses: Start9Labs/start-technologies/.github/workflows/build.yml@master
+    uses: Start9Labs/start-technologies/.github/workflows/build.yml@6627e1582d87b6a8fb0ecf32dfc9e660d74f9f33
     # No DEV_KEY: a build that does not publish does not need the signing key.

@@ -14,7 +14,7 @@
 ## API and MCP
 
 - **REST API:** the **REST API** interface points to Listmonk's native authenticated `/api` endpoints. Create human-managed API users and roles from Listmonk when another application needs direct API access.
-- **MCP:** the **MCP** interface is a Streamable HTTP endpoint for AI agents. It requires a package-generated bearer token and uses a dedicated internal Listmonk API user named `startos-mcp`. The package limits it to newsletter operations and read-only settings access; it does not expose user administration, settings changes, maintenance deletion, transactional email, or application reload.
+- **MCP:** the **MCP** interface is a Streamable HTTP endpoint for AI agents. It requires a package-generated bearer token and uses a dedicated internal Listmonk API user named `startos-mcp`. The package limits it to draft newsletter operations and selected read operations; it does not grant settings access, campaign sending, subscriber mutation, user administration, settings changes, maintenance deletion, transactional email, or application reload. Wrapper revision `6.2.0:5` repairs an earlier first-run role-ID collision that could grant this internal account superadmin privileges; existing human accounts and credentials are preserved.
 - The MCP credential is not shown through a StartOS action because action responses can be written to package logs. Configure trusted agents through a secure local management path.
 - Treat MCP access as administrative. Do not publish the MCP interface to the public internet without a separate access-control review.
 

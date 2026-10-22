@@ -1,11 +1,12 @@
 name: Build
 
 on:
+  workflow_call:
   workflow_dispatch:
   pull_request:
     paths-ignore: ['*.md']
   push:
-    branches: ['startos-package']
+    branches: ['master', 'startos-package']
     paths-ignore: ['*.md']
 
 concurrency:
@@ -13,6 +14,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      # The HTTP integration test starts the real MCP server, not a mock.
+      - run: npm ci --prefix mcp --omit=dev --ignore-scripts
+      - run: npm run check
+      - run: npm test
+      - run: python3 scripts/test-release.py
+      - run: python3 scripts/github-release.py metadata
+      - name: Lint GitHub workflows (including inline shell)
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
   build:
-    uses: Start9Labs/start-technologies/.github/workflows/build.yml@master
+    needs: test
+    uses: Start9Labs/start-technologies/.github/workflows/build.yml@6627e1582d87b6a8fb0ecf32dfc9e660d74f9f33
     # No DEV_KEY: a build that does not publish does not need the signing key.

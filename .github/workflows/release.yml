@@ -1,0 +1,55 @@
+name: GitHub Release
+
+on:
+  push:
+    branches: ['master']
+  workflow_dispatch:
+
+permissions: {}
+
+# Never cancel publication midway or race two releases of the same version.
+concurrency:
+  group: listmonk-github-release
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - run: python3 scripts/test-release.py
+      - run: python3 scripts/github-release.py preflight
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  build:
+    needs: preflight
+    permissions:
+      contents: read
+    uses: ./.github/workflows/build.yml
+    # No secrets forwarded: native builds generate ephemeral signing identities.
+
+  publish:
+    needs: [preflight, build]
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Install the approved package inspection CLI
+        uses: Start9Labs/start-technologies/.github/actions/install-start-cli@6627e1582d87b6a8fb0ecf32dfc9e660d74f9f33
+      - name: Verify exact-run packages before creating a new tag and release
+        run: python3 scripts/github-release.py publish
+        env:
+          GH_TOKEN: ${{ github.token }}

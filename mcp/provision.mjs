@@ -28,6 +28,24 @@ try {
     .update(store.listmonkToken)
     .digest('hex')
   await client.query('BEGIN')
+  // v6.2.0 treats role ID 1 as superadmin regardless of permissions. Reserve
+  // it before creating any package role, and repair older fresh installs that
+  // accidentally gave that ID to MCP. Human users retain their original role.
+  await client.query('LOCK TABLE roles IN EXCLUSIVE MODE')
+  await client.query(
+    `UPDATE roles SET name = 'StartOS reserved superadmin', updated_at = NOW()
+     WHERE id = 1 AND type = 'user' AND name = 'StartOS MCP'`,
+  )
+  await client.query(
+    `INSERT INTO roles (id, type, name, permissions)
+     VALUES (1, 'user', 'StartOS reserved superadmin', '{}'::text[])
+     ON CONFLICT (id) DO NOTHING`,
+  )
+  await client.query(
+    `SELECT setval(pg_get_serial_sequence('roles', 'id'),
+       GREATEST((SELECT MAX(id) FROM roles),
+         (SELECT last_value FROM roles_id_seq)), true)`,
+  )
   const role = await client.query(
     `INSERT INTO roles (type, name, permissions)
      VALUES ('user', $1, $2::text[])
@@ -37,6 +55,10 @@ try {
      RETURNING id`,
     ['StartOS MCP', LISTMONK_ROLE_PERMISSIONS],
   )
+
+  if (Number(role.rows[0].id) <= 1) {
+    throw new Error('MCP must never use the reserved superadmin role')
+  }
 
   await client.query(
     `INSERT INTO users

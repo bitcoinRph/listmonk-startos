@@ -32,7 +32,4 @@ jobs:
       - run: python3 scripts/github-release.py metadata
       - name: Lint GitHub workflows (including inline shell)
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
-  build:
-    needs: test
-    uses: Start9Labs/start-technologies/.github/workflows/build.yml@6627e1582d87b6a8fb0ecf32dfc9e660d74f9f33
-    # No DEV_KEY: a build that does not publish does not need the signing key.
+      - run: python3 scripts/test-direct-release.py

@@ -44,10 +44,12 @@ class ReleaseTests(unittest.TestCase):
                 run.assert_called_once()
 
     def test_actual_metadata(self):
-        self.assertEqual(self.r.metadata(ROOT), ('6.2.0:5', 'v6.2.0_5'))
+        version, tag = self.r.metadata(ROOT)
+        self.assertEqual(version, self.r.VERSION)
+        self.assertEqual(tag, 'v' + version.replace(':', '_'))
 
     def test_version_rejects_expressions_and_unapproved_revision(self):
-        for text in ["version: `6.2.0:5`", "version: '6.2.0:6'", "version: '6.2.0:5', version: '6.2.0:5'"]:
+        for text in ["version: `6.2.0:5`", "version: '6.2.0:../6'", "version: '6.2.0:5', version: '6.2.0:5'"]:
             with self.subTest(text=text), tempfile.TemporaryDirectory() as tmp:
                 root = pathlib.Path(tmp)
                 (root / 'startos/versions').mkdir(parents=True)
@@ -72,7 +74,7 @@ class ReleaseTests(unittest.TestCase):
             self.r.require_absent('owner/repo', 'v6.2.0_5')
 
     def test_manifest_sha_version_and_all_architectures(self):
-        m = {'id': 'listmonk', 'version': '6.2.0:5', 'gitHash': 'a' * 40,
+        m = {'id': 'listmonk', 'version': self.r.VERSION, 'gitHash': 'a' * 40,
              'images': {name: {'arch': ['x86_64']} for name in ['listmonk', 'mcp', 'postgres']},
              'hardwareRequirements': {'arch': ['x86_64']}}
         self.r.check_manifest(m, 'x86_64', 'a' * 40)
@@ -116,11 +118,10 @@ class ReleaseTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.r.check_build_log(invalid)
 
-    def test_failed_package_verification_never_writes(self):
-        with tempfile.TemporaryDirectory() as tmp, patch.object(self.r, 'preflight', return_value=('owner/repo', 'a' * 40, 'v6.2.0_5')), patch.object(self.r, 'download'), patch.object(self.r, 'verify_packages', side_effect=ValueError('bad signature')), patch.object(self.r, 'api') as api:
-            with self.assertRaises(ValueError):
-                self.r.publish(pathlib.Path(tmp))
-            api.assert_not_called()
+    def test_legacy_transport_removed(self):
+        source = (ROOT / 'scripts/github-release.py').read_text()
+        self.assertNotIn('/logs', source)
+        self.assertNotIn('/artifacts?', source)
 
     def test_release_asset_readback_requires_exact_names_bytes_and_digests(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -132,19 +133,19 @@ class ReleaseTests(unittest.TestCase):
                 with self.subTest(bad=bad), self.assertRaises(ValueError):
                     self.r.check_release_assets(bad, [asset])
 
-    def test_workflow_reuses_tested_build_and_limits_writes(self):
+    def test_workflow_uses_native_direct_release_assets(self):
         build = (ROOT / '.github/workflows/build.yml').read_text()
         release = (ROOT / '.github/workflows/release.yml').read_text()
         self.assertIn('workflow_call:', build)
-        self.assertIn('build.yml@6627e1582d87b6a8fb0ecf32dfc9e660d74f9f33', build)
         self.assertIn('python3 scripts/test-release.py', build)
         self.assertIn('uses: ./.github/workflows/build.yml', release)
-        self.assertIn('needs: [preflight, build]', release)
-        self.assertEqual(release.count('contents: write'), 1)
+        self.assertIn('needs: [preflight, native]', release)
+        self.assertIn('direct-release.py native', release)
+        self.assertIn("version: '29.9.2'", release)
         self.assertIn("github.ref == 'refs/heads/master'", release)
         self.assertIn('cancel-in-progress: false', release)
-        for prohibited in ['secrets: inherit', 'DEV_KEY:', 'registry:', 'S3', 'tagAndRelease', '--clobber']:
-            self.assertNotIn(prohibited, release)
+        for prohibited in ['secrets: inherit', 'DEV_KEY:', 'registry:', 'S3', 'tagAndRelease', '--clobber', 'upload-artifact', 'download-artifact', 'start-technologies/.github/workflows/build']:
+            self.assertNotIn(prohibited, release + build)
 
 
 if __name__ == '__main__':

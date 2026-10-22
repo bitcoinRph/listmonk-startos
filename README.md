@@ -13,7 +13,7 @@
 - **Upstream repo:** <https://github.com/knadh/listmonk>
 - **Wrapper repo:** <https://github.com/bitcoinRph/listmonk-startos>
 
-This repository is a fork of upstream listmonk, repurposed as a StartOS wrapper on the `startos-package` branch. The upstream source is not rebuilt; the package pulls the published image.
+This repository is a fork of upstream listmonk, repurposed as a StartOS wrapper on the default `master` branch (with the legacy `startos-package` branch retained). The upstream source is not rebuilt; the package pulls the published image.
 
 ## Image and Container Runtime
 
@@ -50,7 +50,7 @@ PostgreSQL listens on `127.0.0.1:5432` only and is not exposed.
 
 1. On install, init generates the internal Postgres password, a dedicated Listmonk API token for the MCP sidecar, and a separate bearer token for MCP clients.
 2. On first start, Postgres initializes the `listmonk` database, then `listmonk --install --idempotent` creates the schema without an administrator account.
-3. Before Listmonk starts serving requests, an idempotent provisioning step creates or repairs the `StartOS MCP` role and `startos-mcp` API user. Its token is stored as a SHA-256 hash in Listmonk's database, matching Listmonk 6.2's native API-user behavior.
+3. Before Listmonk starts serving requests, provisioning reserves upstream’s superadmin role ID 1, repairing older package-created MCP roles that accidentally occupied it. The dedicated MCP role always has an ID greater than 1; existing human accounts remain unchanged. An idempotent provisioning step creates or repairs the `StartOS MCP` role and `startos-mcp` API user. Its token is stored as a SHA-256 hash in Listmonk's database, matching Listmonk 6.2's native API-user behavior.
 4. Listmonk starts and loads the dedicated API user into its in-memory authentication cache, then the MCP sidecar starts.
 5. On the first Web UI visit, Listmonk’s own setup page asks the operator to create the super-admin account. The password never passes through StartOS package state or action logs.
 
@@ -103,8 +103,10 @@ Use timestamped, no-clobber rollback filenames and verify owner and mode after c
 
 ```
 npm ci
+npm ci --prefix mcp --omit=dev --ignore-scripts
 npm run check
+npm test
 make            # x86_64 and aarch64 .s9pk
 ```
 
-CI: `.github/workflows/build.yml` builds on pull requests using Start9's shared workflow.
+CI: `.github/workflows/build.yml` runs the type-check and MCP integration tests before using Start9's shared workflow to build x86_64 and aarch64 artifacts. It runs on pull requests and pushes to `master` or `startos-package`. No production signing key is used for these test artifacts.

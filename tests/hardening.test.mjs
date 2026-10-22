@@ -4,6 +4,7 @@ import { generateKeyPairSync, privateDecrypt, constants } from 'node:crypto'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { createServer } from 'node:http'
 import test from 'node:test'
 
 const repo = new URL('../', import.meta.url)
@@ -72,6 +73,15 @@ test('server policy uses an exact least-privilege tool list', async () => {
       `unsafe MCP tool matched ${pattern}`,
     )
   }
+})
+
+test('MCP provisioning reserves and rejects the upstream superadmin role ID', async () => {
+  const source = await text('mcp/provision.mjs')
+  assert.match(source, /LOCK TABLE roles IN EXCLUSIVE MODE/)
+  assert.match(source, /WHERE id = 1 AND type = 'user' AND name = 'StartOS MCP'/)
+  assert.match(source, /VALUES \(1, 'user', 'StartOS reserved superadmin'/)
+  assert.match(source, /Number\(role\.rows\[0\]\.id\) <= 1/)
+  assert.ok(source.indexOf('INSERT INTO roles (id,') < source.indexOf('VALUES (\'user\', $1'))
 })
 
 test('dedicated Listmonk role excludes send and subscriber mutation permissions', async () => {
@@ -151,6 +161,13 @@ test('HTTP entrypoint enforces auth, sanitizes malformed JSON, and exposes exact
   const dir = await mkdtemp(join(tmpdir(), 'listmonk-mcp-test-'))
   const store = join(dir, 'store.json')
   const port = 41_000 + (process.pid % 1_000)
+  const upstreamCalls = []
+  const upstream = createServer((req, res) => {
+    upstreamCalls.push({ method: req.method, url: req.url })
+    res.setHeader('content-type', 'application/json')
+    res.end(JSON.stringify({ data: { results: [], total: 0, page: 1, per_page: 20 } }))
+  })
+  await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve))
   await writeFile(
     store,
     JSON.stringify({ listmonkToken: 'test-api-token', serverAuthToken: 'test-bearer' }),
@@ -162,7 +179,7 @@ test('HTTP entrypoint enforces auth, sanitizes malformed JSON, and exposes exact
       ...process.env,
       PORT: String(port),
       MCP_STORE_PATH: store,
-      LISTMONK_URL: 'http://127.0.0.1:9',
+      LISTMONK_URL: `http://127.0.0.1:${upstream.address().port}`,
       LISTMONK_API_USER: 'test-user',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -214,6 +231,50 @@ test('HTTP entrypoint enforces auth, sanitizes malformed JSON, and exposes exact
     assert.equal(names.includes('listmonk_update_campaign'), false)
     assert.equal(names.includes('listmonk_get_settings'), false)
     assert.equal(names.includes('listmonk_get_logs'), false)
+    const { SAFE_TOOL_NAMES } = await import('../mcp/policy.mjs')
+    assert.deepEqual(names.sort(), [...SAFE_TOOL_NAMES].sort())
+
+    // Small authenticated requests exercise the actual SDK element guard, not
+    // an OOM payload. Unknown keys would otherwise be stripped by Zod.
+    const call = (args) => postMcp(`${base}/mcp`, {
+      jsonrpc: '2.0', id: 3, method: 'tools/call',
+      params: { name: 'listmonk_list_lists', arguments: args },
+    })
+    for (const args of [
+      { extra: Array(10_000).fill(0) },
+      { extra: Object.fromEntries(Array.from({ length: 10_000 }, (_, i) => [`k${i}`, 0])) },
+      { extra: Array.from({ length: 5_000 }, () => ({ key: 0 })) },
+    ]) {
+      assert.ok(Buffer.byteLength(JSON.stringify(args)) < 1024 * 1024)
+      response = await call(args)
+      assert.equal(response.status, 200)
+      const result = parseMcpResponse(await response.text()).result
+      assert.equal(result.isError, true)
+      assert.match(result.content[0].text, /more than the maximum of 10000 elements/i)
+    }
+    assert.equal(upstreamCalls.length, 0, 'excessive input must never reach the tool handler')
+    // Exactly 10,000 elements gets past the guard and the allowlisted handler
+    // still executes, including schema stripping of unknown keys.
+    response = await call({ extra: Array(9_999).fill(0) })
+    const atLimit = parseMcpResponse(await response.text()).result
+    assert.notEqual(atLimit.isError, true)
+    assert.equal(upstreamCalls.length, 1)
+    assert.equal(upstreamCalls[0].method, 'GET')
+    assert.match(upstreamCalls[0].url, /^\/api\/lists/)
+    response = await call({ page: 1, per_page: 20 })
+    assert.notEqual(parseMcpResponse(await response.text()).result.isError, true)
+    assert.equal(upstreamCalls.length, 2)
+    response = await postMcp(`${base}/mcp`, {
+      jsonrpc: '2.0', id: 4, method: 'tools/call',
+      params: { name: 'listmonk_get_settings', arguments: {} },
+    })
+    assert.match(JSON.stringify(parseMcpResponse(await response.text())), /not found/i)
+    assert.equal(upstreamCalls.length, 2, 'forbidden tool must not reach upstream')
+    response = await fetch(`${base}/healthz`)
+    assert.equal(response.status, 200)
+    response = await postMcp(`${base}/mcp`, { padding: 'x'.repeat(1024 * 1024) })
+    assert.equal(response.status, 413)
+
     const create = tools.find((tool) => tool.name === 'listmonk_create_campaign')
     assert.equal('send_later' in create.inputSchema.properties, false)
     assert.equal('send_at' in create.inputSchema.properties, false)
@@ -226,6 +287,7 @@ test('HTTP entrypoint enforces auth, sanitizes malformed JSON, and exposes exact
       ),
     ])
     await rm(dir, { recursive: true, force: true })
+    await new Promise((resolve) => upstream.close(resolve))
   }
 })
 
@@ -451,6 +513,6 @@ test('credential runbook requires ownership, runtime readability, and rollback c
 test('custom server declares its directly imported dependencies', async () => {
   const pkg = JSON.parse(await text('mcp/package.json'))
 
-  assert.equal(pkg.dependencies['@modelcontextprotocol/sdk'], '1.30.1')
+  assert.equal(pkg.dependencies['@modelcontextprotocol/sdk'], '1.32.1')
   assert.equal(pkg.dependencies.express, '4.22.3')
 })

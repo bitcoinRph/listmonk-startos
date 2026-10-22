@@ -5,7 +5,7 @@ on:
   pull_request:
     paths-ignore: ['*.md']
   push:
-    branches: ['startos-package']
+    branches: ['master', 'startos-package']
     paths-ignore: ['*.md']
 
 concurrency:
@@ -13,6 +13,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      # The HTTP integration test starts the real MCP server, not a mock.
+      - run: npm ci --prefix mcp --omit=dev --ignore-scripts
+      - run: npm run check
+      - run: npm test
   build:
+    needs: test
     uses: Start9Labs/start-technologies/.github/workflows/build.yml@master
     # No DEV_KEY: a build that does not publish does not need the signing key.

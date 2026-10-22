@@ -66,7 +66,9 @@ app.post('/mcp', async (req, res) => {
   try {
     const server = new McpServer(
       { name: SERVER_NAME, version: SERVER_VERSION },
-      { capabilities: { tools: {} } },
+      // Bound aggregate object keys + array elements before SDK schema validation.
+      // Large content strings still fit; bulk subscriber writes are not exposed.
+      { capabilities: { tools: {} }, maxToolInputElements: 10_000 },
     )
     registerFilteredTools(server, listmonkClient, HARDENED_TOOLS, safeToolNames)
 
@@ -90,6 +92,10 @@ app.post('/mcp', async (req, res) => {
 })
 
 app.use((error, _req, res, _next) => {
+  if (error.type === 'entity.too.large') {
+    res.status(413).json({ error: 'Request body too large' })
+    return
+  }
   if (error instanceof SyntaxError) {
     res.status(400).json({ error: 'Malformed JSON request' })
     return

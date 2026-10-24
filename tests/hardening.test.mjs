@@ -513,6 +513,6 @@ test('credential runbook requires ownership, runtime readability, and rollback c
 test('custom server declares its directly imported dependencies', async () => {
   const pkg = JSON.parse(await text('mcp/package.json'))
 
-  assert.equal(pkg.dependencies['@modelcontextprotocol/sdk'], '1.32.1')
+  assert.equal(pkg.dependencies['@modelcontextprotocol/sdk'], '1.32.2')
   assert.equal(pkg.dependencies.express, '4.22.3')
 })

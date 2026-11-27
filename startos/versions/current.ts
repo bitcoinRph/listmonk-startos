@@ -1,10 +1,10 @@
 import { IMPOSSIBLE, VersionInfo } from '@start9labs/start-sdk'
 
 export const current = VersionInfo.of({
-  version: '6.2.0:7',
+  version: '6.2.0:8',
   releaseNotes: {
     en_US:
-      'Security update for the MCP server: updates follow-redirects to 1.16.3 and @hono/node-server to 2.1.6 to fix published advisories. No change to listmonk, settings or data.',
+      'Security update for the MCP server: updates hono to 4.13.23 to fix published advisories, and pg to 8.23.1. No change to listmonk, settings or data.',
   },
   migrations: {
     up: async () => {},
